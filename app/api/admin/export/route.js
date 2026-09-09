@@ -7,9 +7,8 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get('slug');
 
-  const clicks = slug ? getClicksBySlug(slug) : getClicks();
+  const clicks = slug ? await getClicksBySlug(slug) : await getClicks();
 
-  // Build CSV with all fields including lat/lon and ISP
   const headers = [
     'Timestamp', 'Link Slug', 'Country', 'Country Code', 'Region', 'City',
     'Latitude', 'Longitude', 'Timezone', 'ISP',
@@ -18,25 +17,10 @@ export async function GET(request) {
   ];
 
   const rows = clicks.map((c) => [
-    c.timestamp,
-    c.slug,
-    c.country,
-    c.countryCode || '',
-    c.region,
-    c.city,
-    c.lat ?? '',
-    c.lon ?? '',
-    c.timezone || '',
-    c.isp || '',
-    c.device,
-    c.os,
-    c.osVersion || '',
-    c.browser,
-    c.browserVersion || '',
-    c.deviceModel || '',
-    c.deviceVendor || '',
-    c.referrer,
-    c.ip || '',
+    c.timestamp, c.slug, c.country, c.countryCode || '', c.region, c.city,
+    c.lat ?? '', c.lon ?? '', c.timezone || '', c.isp || '',
+    c.device, c.os, c.osVersion || '', c.browser, c.browserVersion || '',
+    c.deviceModel || '', c.deviceVendor || '', c.referrer, c.ip || '',
   ]);
 
   const csv = [

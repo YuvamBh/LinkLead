@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request, { params }) {
   const { slug } = await params;
 
-  const link = getLinkBySlug(slug);
+  const link = await getLinkBySlug(slug);
   if (!link) {
     return NextResponse.json({ error: 'Link not found' }, { status: 404 });
   }
@@ -89,8 +89,7 @@ export async function GET(request, { params }) {
     ip: ip === '127.0.0.1' || ip === '::1' ? 'localhost' : ip.split('.').slice(0, 2).join('.') + '.*.*',
   };
 
-  // Kick off the geo lookup in the background so the redirect is instant.
-  // The click gets saved to disk once geo resolves (or after timeout).
+  // Kick off geo lookup and click save in the background - redirect happens immediately
   (async () => {
     try {
       const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === 'localhost';
@@ -114,9 +113,9 @@ export async function GET(request, { params }) {
         }
       }
     } catch {
-      // geo lookup timed out or failed - no big deal, we still have device data
+      // geo lookup timed out or failed - device data still gets saved
     }
-    addClick(clickRecord);
+    await addClick(clickRecord);
   })();
 
   return NextResponse.redirect(link.destination, { status: 302 });

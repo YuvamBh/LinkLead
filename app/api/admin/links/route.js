@@ -4,7 +4,7 @@ import { getLinks, addLink, deleteLink } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const links = getLinks();
+  const links = await getLinks();
   return NextResponse.json({ links });
 }
 
@@ -14,13 +14,9 @@ export async function POST(request) {
     const { slug, destination } = body;
 
     if (!slug || !destination) {
-      return NextResponse.json(
-        { error: 'Both slug and destination are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Both slug and destination are required' }, { status: 400 });
     }
 
-    // Validate slug format
     if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
       return NextResponse.json(
         { error: 'Slug can only contain letters, numbers, hyphens, and underscores' },
@@ -28,24 +24,21 @@ export async function POST(request) {
       );
     }
 
-    // Validate URL
     try {
       new URL(destination);
     } catch {
-      return NextResponse.json(
-        { error: 'Invalid destination URL' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid destination URL' }, { status: 400 });
     }
 
-    const result = addLink({ slug, destination });
+    const result = await addLink({ slug, destination });
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: 409 });
     }
 
     return NextResponse.json({ link: result.link }, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  } catch (err) {
+    console.error('POST /api/admin/links error:', err);
+    return NextResponse.json({ error: 'Server error: ' + err.message }, { status: 500 });
   }
 }
 
@@ -57,7 +50,7 @@ export async function DELETE(request) {
     return NextResponse.json({ error: 'Slug is required' }, { status: 400 });
   }
 
-  const result = deleteLink(slug);
+  const result = await deleteLink(slug);
   if (result.error) {
     return NextResponse.json({ error: result.error }, { status: 404 });
   }
