@@ -1,40 +1,21 @@
 import { getLinkBySlug } from '@/lib/db';
+import { extractOgMetadata } from '@/lib/og';
 import { notFound } from 'next/navigation';
 import LinkRedirectClient from './client';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Fetches OG metadata from the destination URL.
- * Called at request-time on the server — bots/crawlers see the result as real meta tags.
- */
-async function fetchOgMeta(destinationUrl) {
-  try {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      (process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'http://localhost:3000');
-
-    const apiUrl = `${baseUrl}/api/og?url=${encodeURIComponent(destinationUrl)}`;
-    const res = await fetch(apiUrl, {
-      signal: AbortSignal.timeout(9000),
-      next: { revalidate: 3600 }, // cache 1 hour
-    });
-
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch {
-    // If OG fetch fails, continue with defaults
-  }
-  return null;
+function getSiteOrigin() {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return 'https://linklead-nine.vercel.app';
 }
 
 /**
  * generateMetadata — runs on the server at request time.
- * When WhatsApp / Twitter / iMessage / Slack hit this URL,
- * they see these OG tags and render a rich preview card.
+ * When WhatsApp, Twitter/X, iMessage, or Slack crawl this short link,
+ * they parse these exact OpenGraph & Twitter tags to render the rich preview card.
  */
 export async function generateMetadata({ params }) {
   const { slug } = await params;
@@ -44,42 +25,57 @@ export async function generateMetadata({ params }) {
     return { title: 'Link Not Found' };
   }
 
-  const og = await fetchOgMeta(link.destination);
+  const origin = getSiteOrigin();
+  const og = await extractOgMetadata(link.destination);
 
-  const title = og?.title || link.destination;
-  const description = og?.description || `Shared via LinkLead → ${link.destination}`;
-  const image = og?.image || null;
-  const siteName = og?.siteName || new URL(link.destination).hostname.replace(/^www\./, '');
+  const fallbackDomain = (() => {
+    try {
+      return new URL(link.destination).hostname.replace(/^www\./, '');
+    } catch {
+      return 'linklead.app';
+    }
+  })();
 
-  const meta = {
+  const title = og?.title || fallbackDomain;
+  const description = og?.description || `Click to view ${fallbackDomain}`;
+  const siteName = og?.siteName || fallbackDomain;
+
+  // If destination has a valid OG image, use it. Otherwise, use our dynamic 1200x630 OG image.
+  // WhatsApp REQUIRES an image or it will drop the entire preview card.
+  const image =
+    og?.image ||
+    `${origin}/api/og/image?title=${encodeURIComponent(title)}&domain=${encodeURIComponent(siteName)}&desc=${encodeURIComponent(description.slice(0, 100))}`;
+
+  return {
     title,
     description,
     openGraph: {
       title,
       description,
-      url: link.destination,
+      url: `${origin}/${slug}`,
       siteName,
       type: 'website',
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
     },
     twitter: {
-      card: image ? 'summary_large_image' : 'summary',
+      card: 'summary_large_image',
       title,
       description,
+      images: [image],
     },
   };
-
-  if (image) {
-    meta.openGraph.images = [{ url: image }];
-    meta.twitter.images = [image];
-  }
-
-  return meta;
 }
 
 /**
- * Server component page — renders minimal HTML with the OG meta tags injected.
- * The client component handles the instant redirect for real users.
- * Bots stop here, read the meta tags, and generate a preview card.
+ * Server component page — renders HTML with injected OG meta tags for crawlers.
+ * Real users run the client component for instant countdown redirect.
  */
 export default async function SlugPage({ params }) {
   const { slug } = await params;
@@ -89,7 +85,7 @@ export default async function SlugPage({ params }) {
     notFound();
   }
 
-  const og = await fetchOgMeta(link.destination);
+  const og = await extractOgMetadata(link.destination);
 
   return (
     <LinkRedirectClient
