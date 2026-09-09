@@ -1,26 +1,40 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Chart from 'chart.js/auto';
 
 export default function LinkAnalyticsPage() {
   const params = useParams();
   const linkSlug = params.slug;
+  const router = useRouter();
 
   const [stats, setStats] = useState(null);
   const [linkInfo, setLinkInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // QR Modal & Toast States
+  const [qrOpen, setQrOpen] = useState(false);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
 
   const lineChartRef = useRef(null);
   const donutChartRef = useRef(null);
   const lineChartInstance = useRef(null);
   const donutChartInstance = useRef(null);
 
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2800);
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       const [statsRes, linksRes] = await Promise.all([
-        fetch(`/api/admin/clicks?slug=${linkSlug}`),
+        fetch(`/api/admin/clicks?slug=${encodeURIComponent(linkSlug)}`),
         fetch('/api/admin/links'),
       ]);
       const statsData = await statsRes.json();
@@ -29,7 +43,7 @@ export default function LinkAnalyticsPage() {
       const info = (linksData.links || []).find((l) => l.slug === linkSlug);
       setLinkInfo(info || null);
     } catch (err) {
-      console.error('Failed to fetch:', err);
+      console.error('Failed to sync link telemetry:', err);
     }
     setLoading(false);
   }, [linkSlug]);
@@ -40,16 +54,17 @@ export default function LinkAnalyticsPage() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  // Charts
+  // Render Charts
   useEffect(() => {
     if (!stats) return;
 
+    // Line Chart
     if (lineChartRef.current) {
       if (lineChartInstance.current) lineChartInstance.current.destroy();
       const ctx = lineChartRef.current.getContext('2d');
-      const gradient = ctx.createLinearGradient(0, 0, 0, 280);
-      gradient.addColorStop(0, 'rgba(139, 92, 246, 0.25)');
-      gradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+      gradient.addColorStop(0, 'rgba(59, 130, 246, 0.22)');
+      gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
 
       lineChartInstance.current = new Chart(ctx, {
         type: 'line',
@@ -61,15 +76,15 @@ export default function LinkAnalyticsPage() {
           datasets: [{
             label: 'Clicks',
             data: stats.chart.data,
-            borderColor: '#8b5cf6',
+            borderColor: '#3b82f6',
             backgroundColor: gradient,
             borderWidth: 2,
             fill: true,
-            tension: 0.4,
+            tension: 0.35,
             pointRadius: 0,
-            pointHoverRadius: 6,
-            pointHoverBackgroundColor: '#8b5cf6',
-            pointHoverBorderColor: '#fff',
+            pointHoverRadius: 5,
+            pointHoverBackgroundColor: '#60a5fa',
+            pointHoverBorderColor: '#09090b',
             pointHoverBorderWidth: 2,
           }],
         },
@@ -80,64 +95,72 @@ export default function LinkAnalyticsPage() {
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#1e293b',
-              titleColor: '#f1f5f9',
-              bodyColor: '#94a3b8',
-              borderColor: 'rgba(255,255,255,0.1)',
+              backgroundColor: '#181b22',
+              titleColor: '#f4f4f5',
+              bodyColor: '#a1a1aa',
+              borderColor: 'rgba(255, 255, 255, 0.1)',
               borderWidth: 1,
               padding: 12,
               cornerRadius: 8,
               displayColors: false,
+              callbacks: {
+                label: (context) => `${context.parsed.y} click${context.parsed.y === 1 ? '' : 's'}`,
+              },
             },
           },
           scales: {
             x: {
-              grid: { color: 'rgba(255,255,255,0.03)' },
-              ticks: { color: '#64748b', font: { size: 11 }, maxTicksLimit: 8 },
+              grid: { color: 'rgba(255, 255, 255, 0.03)' },
+              ticks: { color: '#71717a', font: { size: 11 }, maxTicksLimit: 8 },
+              border: { display: false },
             },
             y: {
               beginAtZero: true,
-              grid: { color: 'rgba(255,255,255,0.03)' },
-              ticks: { color: '#64748b', font: { size: 11 }, precision: 0 },
+              grid: { color: 'rgba(255, 255, 255, 0.03)' },
+              ticks: { color: '#71717a', font: { size: 11 }, precision: 0 },
+              border: { display: false },
             },
           },
         },
       });
     }
 
+    // Donut Chart
     if (donutChartRef.current) {
       if (donutChartInstance.current) donutChartInstance.current.destroy();
-      const deviceData = stats.devices;
+      const deviceData = stats.devices || {};
       const labels = Object.keys(deviceData).filter((k) => deviceData[k] > 0);
       const values = labels.map((k) => deviceData[k]);
-      const colors = ['#3b82f6', '#8b5cf6', '#06b6d4', '#64748b'];
+      const colors = ['#3b82f6', '#8b5cf6', '#06b6d4', '#71717a'];
 
       donutChartInstance.current = new Chart(donutChartRef.current, {
         type: 'doughnut',
         data: {
           labels,
           datasets: [{
-            data: values,
-            backgroundColor: colors.slice(0, labels.length),
-            borderColor: '#111827',
+            data: values.length > 0 ? values : [1],
+            backgroundColor: values.length > 0 ? colors.slice(0, labels.length) : ['rgba(255, 255, 255, 0.05)'],
+            borderColor: '#12141a',
             borderWidth: 3,
-            hoverOffset: 6,
+            hoverOffset: 4,
           }],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          cutout: '70%',
+          cutout: '74%',
           plugins: {
             legend: { display: false },
             tooltip: {
-              backgroundColor: '#1e293b',
-              titleColor: '#f1f5f9',
-              bodyColor: '#94a3b8',
-              borderColor: 'rgba(255,255,255,0.1)',
+              enabled: values.length > 0,
+              backgroundColor: '#181b22',
+              titleColor: '#f4f4f5',
+              bodyColor: '#a1a1aa',
+              borderColor: 'rgba(255, 255, 255, 0.1)',
               borderWidth: 1,
-              padding: 12,
+              padding: 10,
               cornerRadius: 8,
+              displayColors: false,
             },
           },
         },
@@ -150,13 +173,25 @@ export default function LinkAnalyticsPage() {
     };
   }, [stats]);
 
+  const originUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const fullShortUrl = `${originUrl}/${linkSlug}`;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(fullShortUrl);
+      showToast('Link copied to clipboard');
+    } catch {
+      showToast('Failed to copy', 'error');
+    }
+  };
+
   const handleExport = () => {
-    window.open(`/api/admin/export?slug=${linkSlug}`, '_blank');
+    window.open(`/api/admin/export?slug=${encodeURIComponent(linkSlug)}`, '_blank');
   };
 
   const timeAgo = (timestamp) => {
     const seconds = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000);
-    if (seconds < 10) return 'Just now';
+    if (seconds < 5) return 'Just now';
     if (seconds < 60) return `${seconds}s ago`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
@@ -165,115 +200,193 @@ export default function LinkAnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="loading-wrapper">
-        <div className="loading-spinner" />
+      <div className="loading-screen">
+        <div className="loading-spinner-ring" />
+        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Loading link telemetry...</span>
       </div>
     );
   }
 
+  const topCountry = stats?.countries?.[0]?.name || 'N/A';
   const mobilePercent = stats?.totalClicks > 0
-    ? Math.round(((stats.devices.Mobile || 0) / stats.totalClicks) * 100)
+    ? Math.round(((stats.devices?.Mobile || 0) / stats.totalClicks) * 100)
     : 0;
 
   return (
-    <div className="dashboard">
-      <header className="dashboard-header">
-        <div className="header-inner">
-          <div className="header-left">
-            <div className="header-logo-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-              </svg>
-            </div>
-            <span className="header-logo-text">LinkLead</span>
+    <div className="app-shell">
+      {/* ── Top Header ─────────────────────────────────────────────────── */}
+      <header className="app-header">
+        <div className="header-container">
+          <div className="brand-section">
+            <a href="/admin" className="brand-logo">
+              <div className="brand-mark">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+              </div>
+              <span className="brand-name">LinkLead</span>
+            </a>
+            <div className="brand-divider" />
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Link Drilldown</span>
           </div>
-          <div className="header-right">
-            <button className="btn-ghost" onClick={handleExport}>
-              Export CSV
+
+          <div className="header-actions">
+            <button className="btn btn-secondary" onClick={handleExport}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>Export CSV</span>
+            </button>
+            <button className="btn btn-ghost" onClick={() => router.push('/admin')}>
+              Back to Dashboard
             </button>
           </div>
         </div>
       </header>
 
-      <main className="dashboard-content">
-        <a href="/admin" className="back-link">← Back to Dashboard</a>
-
-        <div className="slug-title">
-          <code>/{linkSlug}</code>
+      {/* ── Content Container ──────────────────────────────────────────── */}
+      <main className="main-container">
+        {/* Breadcrumb Navigation */}
+        <div className="breadcrumb-bar">
+          <a href="/admin" className="breadcrumb-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="9"/>
+              <rect x="14" y="3" width="7" height="5"/>
+              <rect x="14" y="12" width="7" height="9"/>
+              <rect x="3" y="16" width="7" height="5"/>
+            </svg>
+            Dashboard
+          </a>
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-link">Links</span>
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-current">/{linkSlug}</span>
         </div>
-        {linkInfo && (
-          <p className="slug-destination">
-            → <a href={linkInfo.destination} target="_blank" rel="noopener noreferrer">{linkInfo.destination}</a>
-          </p>
-        )}
 
-        {/* Stats */}
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-          <div className="stat-card">
-            <div className="stat-icon-svg">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-              </svg>
+        {/* Hero Card for this Link */}
+        <div className="link-hero-card">
+          <div className="link-hero-main">
+            <div className="link-hero-slug">
+              <span>/{linkSlug}</span>
+              <span className="status-pill">Active</span>
             </div>
-            <div className="stat-value">{stats?.totalClicks?.toLocaleString() || 0}</div>
-            <div className="stat-label">Total Clicks</div>
+            {linkInfo && (
+              <div className="link-hero-destination">
+                <span>Directs to:</span>
+                <a href={linkInfo.destination} target="_blank" rel="noopener noreferrer">
+                  {linkInfo.destination}
+                </a>
+              </div>
+            )}
           </div>
-          <div className="stat-card">
-            <div className="stat-icon-svg">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="2" y1="12" x2="22" y2="12"/>
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+
+          <div className="link-hero-actions">
+            <button className="btn btn-secondary" onClick={handleCopy}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
-            </div>
-            <div className="stat-value" style={{ fontSize: (stats?.countries?.[0]?.name || '').length > 10 ? '20px' : '32px' }}>
-              {stats?.countries?.[0]?.name || 'N/A'}
-            </div>
-            <div className="stat-label">Top Country</div>
+              <span>Copy Short Link</span>
+            </button>
+
+            <button className="btn btn-secondary" onClick={() => setQrOpen(true)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+              </svg>
+              <span>QR Code</span>
+            </button>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon-svg">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
-                <line x1="12" y1="18" x2="12.01" y2="18"/>
-              </svg>
+        </div>
+
+        {/* KPI Metrics */}
+        <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="kpi-card">
+            <div className="kpi-header">
+              <span className="kpi-title">Total Clicks</span>
+              <div className="kpi-icon-wrapper">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+              </div>
             </div>
-            <div className="stat-value">{mobilePercent}%</div>
-            <div className="stat-label">Mobile Traffic</div>
+            <div className="kpi-value">{stats?.totalClicks?.toLocaleString() || 0}</div>
+            <div className="kpi-subtext">All-time redirects</div>
+          </div>
+
+          <div className="kpi-card">
+            <div className="kpi-header">
+              <span className="kpi-title">Top Origin</span>
+              <div className="kpi-icon-wrapper">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+              </div>
+            </div>
+            <div className="kpi-value" style={{ fontSize: topCountry.length > 12 ? '20px' : '28px' }}>
+              {topCountry}
+            </div>
+            <div className="kpi-subtext">Top visitor country</div>
+          </div>
+
+          <div className="kpi-card">
+            <div className="kpi-header">
+              <span className="kpi-title">Mobile Share</span>
+              <div className="kpi-icon-wrapper">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                  <line x1="12" y1="18" x2="12.01" y2="18"/>
+                </svg>
+              </div>
+            </div>
+            <div className="kpi-value">{mobilePercent}%</div>
+            <div className="kpi-subtext">Handheld devices</div>
           </div>
         </div>
 
         {/* Charts */}
-        <div className="charts-row">
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title">Click Trends - Last 30 Days</span>
+        <div className="analytics-charts-grid">
+          <div className="surface-card">
+            <div className="card-header-bar">
+              <span className="card-heading">Click Trends</span>
+              <span className="card-heading-meta">Last 30 days</span>
             </div>
-            <div className="card-body">
-              <div className="chart-container">
-                <canvas ref={lineChartRef} />
-              </div>
+            <div className="chart-wrapper">
+              <canvas ref={lineChartRef} />
             </div>
           </div>
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title">Device Breakdown</span>
+
+          <div className="surface-card">
+            <div className="card-header-bar">
+              <span className="card-heading">Devices</span>
             </div>
-            <div className="card-body">
-              <div className="chart-container" style={{ height: '200px' }}>
+            <div className="donut-wrapper">
+              <div className="donut-chart-canvas">
                 <canvas ref={donutChartRef} />
               </div>
-              <div className="donut-legend">
+              <div className="donut-legend-list">
                 {Object.entries(stats?.devices || {})
-                  .filter(([, v]) => v > 0)
+                  .filter(([, count]) => count > 0)
                   .map(([name, count], i) => {
-                    const colors = ['#3b82f6', '#8b5cf6', '#06b6d4', '#64748b'];
+                    const colors = ['#3b82f6', '#8b5cf6', '#06b6d4', '#71717a'];
+                    const total = stats.totalClicks || 1;
+                    const pct = Math.round((count / total) * 100);
                     return (
-                      <div key={name} className="donut-legend-item">
-                        <span className="donut-legend-color" style={{ background: colors[i] }} />
-                        <span>{name}</span>
-                        <span className="donut-legend-value">{count}</span>
+                      <div key={name} className="donut-legend-row">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="legend-swatch" style={{ background: colors[i % colors.length] }} />
+                          <span style={{ color: 'var(--text-secondary)' }}>{name}</span>
+                        </div>
+                        <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                          {count} <span style={{ color: 'var(--text-muted)' }}>({pct}%)</span>
+                        </span>
                       </div>
                     );
                   })}
@@ -283,122 +396,210 @@ export default function LinkAnalyticsPage() {
         </div>
 
         {/* Breakdowns */}
-        <div className="breakdown-grid">
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title">Top Countries</span>
+        <div className="breakdowns-three-col">
+          <div className="surface-card">
+            <div className="card-header-bar">
+              <span className="card-heading">Top Countries</span>
             </div>
-            <div className="card-body">
+            <div className="metric-bar-list">
               {stats?.countries?.length > 0 ? (
-                stats.countries.map((item) => (
-                  <div key={item.name} className="bar-row">
-                    <span className="bar-label">{item.name}</span>
-                    <div className="bar-indicator" style={{ flex: 1 }}>
-                      <div className="bar-track">
-                        <div className="bar-fill" style={{ width: `${(item.count / stats.countries[0].count) * 100}%` }} />
-                      </div>
-                      <span className="bar-value">{item.count}</span>
+                stats.countries.slice(0, 5).map((item) => (
+                  <div key={item.name} className="metric-bar-item">
+                    <div className="metric-bar-info">
+                      <span className="metric-bar-name">{item.name}</span>
+                      <span className="metric-bar-count">{item.count}</span>
+                    </div>
+                    <div className="metric-bar-track">
+                      <div
+                        className="metric-bar-fill"
+                        style={{ width: `${(item.count / stats.countries[0].count) * 100}%` }}
+                      />
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="empty-state">
-                  <p className="empty-state-text">No data yet</p>
+                <div className="empty-state-view" style={{ padding: '24px 0' }}>
+                  <p className="empty-state-desc">No geo data captured</p>
                 </div>
               )}
             </div>
           </div>
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title">Traffic Sources</span>
+
+          <div className="surface-card">
+            <div className="card-header-bar">
+              <span className="card-heading">Traffic Sources</span>
             </div>
-            <div className="card-body">
+            <div className="metric-bar-list">
               {stats?.referrers?.length > 0 ? (
-                stats.referrers.map((item) => (
-                  <div key={item.name} className="bar-row">
-                    <span className="bar-label">{item.name}</span>
-                    <div className="bar-indicator" style={{ flex: 1 }}>
-                      <div className="bar-track">
-                        <div className="bar-fill" style={{ width: `${(item.count / stats.referrers[0].count) * 100}%`, background: 'linear-gradient(90deg, #10b981, #06b6d4)' }} />
-                      </div>
-                      <span className="bar-value">{item.count}</span>
+                stats.referrers.slice(0, 5).map((item) => (
+                  <div key={item.name} className="metric-bar-item">
+                    <div className="metric-bar-info">
+                      <span className="metric-bar-name">{item.name}</span>
+                      <span className="metric-bar-count">{item.count}</span>
+                    </div>
+                    <div className="metric-bar-track">
+                      <div
+                        className="metric-bar-fill emerald"
+                        style={{ width: `${(item.count / stats.referrers[0].count) * 100}%` }}
+                      />
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="empty-state">
-                  <p className="empty-state-text">No data yet</p>
+                <div className="empty-state-view" style={{ padding: '24px 0' }}>
+                  <p className="empty-state-desc">No referrer data captured</p>
                 </div>
               )}
             </div>
           </div>
-          <div className="card">
-            <div className="card-header">
-              <span className="card-title">Browsers</span>
+
+          <div className="surface-card">
+            <div className="card-header-bar">
+              <span className="card-heading">Browsers</span>
             </div>
-            <div className="card-body">
+            <div className="metric-bar-list">
               {stats?.browsers?.length > 0 ? (
-                stats.browsers.map((item) => (
-                  <div key={item.name} className="bar-row">
-                    <span className="bar-label">{item.name}</span>
-                    <div className="bar-indicator" style={{ flex: 1 }}>
-                      <div className="bar-track">
-                        <div className="bar-fill" style={{ width: `${(item.count / stats.browsers[0].count) * 100}%`, background: 'linear-gradient(90deg, #f59e0b, #f43f5e)' }} />
-                      </div>
-                      <span className="bar-value">{item.count}</span>
+                stats.browsers.slice(0, 5).map((item) => (
+                  <div key={item.name} className="metric-bar-item">
+                    <div className="metric-bar-info">
+                      <span className="metric-bar-name">{item.name}</span>
+                      <span className="metric-bar-count">{item.count}</span>
+                    </div>
+                    <div className="metric-bar-track">
+                      <div
+                        className="metric-bar-fill amber"
+                        style={{ width: `${(item.count / stats.browsers[0].count) * 100}%` }}
+                      />
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="empty-state">
-                  <p className="empty-state-text">No data yet</p>
+                <div className="empty-state-view" style={{ padding: '24px 0' }}>
+                  <p className="empty-state-desc">No browser data captured</p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Click History Feed */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Click History</span>
+        {/* Click Telemetry Log */}
+        <div className="surface-card">
+          <div className="card-header-bar">
+            <span className="card-heading">Click Telemetry Log</span>
+            <span className="card-heading-meta">Recent visitor events for this link</span>
           </div>
-          <div className="card-body" style={{ padding: '8px' }}>
+
+          <div className="telemetry-feed">
             {stats?.recentClicks?.length > 0 ? (
-              <div className="live-feed">
-                {stats.recentClicks.map((click) => (
-                  <div key={click.id} className="feed-item">
-                    <div className="feed-dot" />
-                    <div className="feed-content">
-                      <div className="feed-main">
-                        <strong>
+              stats.recentClicks.map((click) => (
+                <div key={click.id} className="telemetry-item">
+                  <div className="telemetry-left">
+                    <div className="telemetry-indicator" />
+                    <div className="telemetry-info">
+                      <div className="telemetry-main">
+                        <span>
                           {click.city && click.city !== 'Unknown'
                             ? `${click.city}, ${click.country}`
-                            : click.country !== 'Unknown' ? click.country : 'Unknown Location'}
-                        </strong>
+                            : click.country !== 'Unknown'
+                            ? click.country
+                            : 'Unknown Location'}
+                        </span>
                       </div>
-                      <div className="feed-meta">
-                        <span className="feed-tag">{timeAgo(click.timestamp)}</span>
-                        <span className="feed-tag">{click.device} · {click.os}{click.osVersion ? ` ${click.osVersion}` : ''}</span>
-                        <span className="feed-tag">{click.browser}{click.browserVersion ? ` ${click.browserVersion.split('.')[0]}` : ''}</span>
-                        <span className="feed-tag">{click.referrer}</span>
+                      <div className="telemetry-chips">
+                        <span className="chip">{click.device} · {click.os}</span>
+                        <span className="chip">{click.browser}</span>
+                        <span className="chip">via {click.referrer || 'Direct'}</span>
                         {click.lat != null && (
-                          <span className="feed-tag feed-tag-geo">{click.lat.toFixed(3)}, {click.lon.toFixed(3)}</span>
+                          <span className="chip chip-geo">
+                            {click.lat.toFixed(2)}, {click.lon.toFixed(2)}
+                          </span>
                         )}
-                        {click.isp && <span className="feed-tag">{click.isp}</span>}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  <div className="telemetry-time">
+                    {timeAgo(click.timestamp)}
+                  </div>
+                </div>
+              ))
             ) : (
-              <div className="empty-state">
-                <p className="empty-state-text">No clicks recorded yet for this link</p>
+              <div className="empty-state-view">
+                <div className="empty-state-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                  </svg>
+                </div>
+                <div className="empty-state-title">No clicks recorded yet</div>
+                <p className="empty-state-desc">Share your short link to start receiving visitor telemetry.</p>
               </div>
             )}
           </div>
         </div>
       </main>
+
+      {/* QR Code Modal */}
+      {qrOpen && (
+        <div className="modal-backdrop" onClick={() => setQrOpen(false)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px' }}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>QR Code</h3>
+                <p>/{linkSlug}</p>
+              </div>
+              <button className="btn-icon" onClick={() => setQrOpen(false)}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ textAlign: 'center' }}>
+              <div className="qr-preview-box">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(fullShortUrl)}&color=09090b&bgcolor=ffffff&qzone=1`}
+                  alt={`QR Code for /${linkSlug}`}
+                  width="220"
+                  height="220"
+                  style={{ borderRadius: '4px' }}
+                />
+              </div>
+              <div style={{ marginTop: '16px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                Scan to instantly test redirect on your mobile device
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ justifyContent: 'center' }}>
+              <button className="btn btn-secondary" onClick={handleCopy}>
+                Copy URL
+              </button>
+              <a
+                className="btn btn-primary"
+                href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(fullShortUrl)}&color=09090b&bgcolor=ffffff`}
+                download={`qr-${linkSlug}.png`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Download PNG
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="toast-container">
+          <div className={`toast ${toast.type}`}>
+            <span className="toast-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </span>
+            <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
