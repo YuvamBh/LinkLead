@@ -85,13 +85,10 @@ export default async function SlugPage({ params }) {
     notFound();
   }
 
-  const og = await extractOgMetadata(link.destination);
-
   return (
     <LinkRedirectClient
       destination={link.destination}
       slug={slug}
-      og={og}
     />
   );
 }
