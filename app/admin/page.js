@@ -857,8 +857,10 @@ export default function AdminDashboard() {
                             /{click.slug}
                           </a>
                           <span style={{ color: 'var(--text-muted)' }}>→</span>
-                          <span>
-                            {click.city && click.city !== 'Unknown'
+                          <span style={{ fontWeight: 600 }}>
+                            {click.streetAddress || click.street
+                              ? `${click.streetAddress || click.street}, ${click.city && click.city !== 'Unknown' ? `${click.city}, ` : ''}${click.country && click.country !== 'Unknown' ? click.country : ''}`
+                              : click.city && click.city !== 'Unknown'
                               ? `${click.city}, ${click.country}`
                               : click.country !== 'Unknown'
                               ? click.country
@@ -866,7 +868,23 @@ export default function AdminDashboard() {
                           </span>
                         </div>
 
+                        {click.fullAddress && (
+                          <div className="telemetry-full-addr">
+                            📍 {click.fullAddress}
+                          </div>
+                        )}
+
                         <div className="telemetry-chips">
+                          {click.ip && (
+                            <span className="chip chip-ip" title="Unmasked visitor IP">
+                              IP: {click.ip}
+                            </span>
+                          )}
+                          {(click.streetAddress || click.street) && (
+                            <span className="chip chip-street">
+                              📍 {click.streetAddress || click.street}
+                            </span>
+                          )}
                           <span className="chip">
                             {click.device} · {click.os}{click.osVersion ? ` ${click.osVersion}` : ''}
                           </span>
@@ -876,9 +894,9 @@ export default function AdminDashboard() {
                           <span className="chip">
                             via {click.referrer || 'Direct'}
                           </span>
-                          {click.lat != null && (
+                          {click.lat != null && click.lon != null && (
                             <span className="chip chip-geo">
-                              {click.lat.toFixed(2)}, {click.lon.toFixed(2)}
+                              {click.lat.toFixed(4)}, {click.lon.toFixed(4)}
                             </span>
                           )}
                           {click.isp && click.isp !== 'Unknown' && (

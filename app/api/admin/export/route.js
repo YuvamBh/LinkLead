@@ -10,17 +10,36 @@ export async function GET(request) {
   const clicks = slug ? await getClicksBySlug(slug) : await getClicks();
 
   const headers = [
-    'Timestamp', 'Link Slug', 'Country', 'Country Code', 'Region', 'City',
+    'Timestamp', 'Link Slug', 'IP Address', 'Street Address', 'Neighbourhood', 'City', 'Postal Code', 'Region', 'Country', 'Country Code',
     'Latitude', 'Longitude', 'Timezone', 'ISP',
     'Device', 'OS', 'OS Version', 'Browser', 'Browser Version',
-    'Device Model', 'Device Vendor', 'Referrer', 'IP (masked)',
+    'Device Model', 'Device Vendor', 'Referrer', 'Full Address',
   ];
 
   const rows = clicks.map((c) => [
-    c.timestamp, c.slug, c.country, c.countryCode || '', c.region, c.city,
-    c.lat ?? '', c.lon ?? '', c.timezone || '', c.isp || '',
-    c.device, c.os, c.osVersion || '', c.browser, c.browserVersion || '',
-    c.deviceModel || '', c.deviceVendor || '', c.referrer, c.ip || '',
+    c.timestamp,
+    c.slug,
+    c.ip || '',
+    c.streetAddress || c.street || '',
+    c.neighbourhood || '',
+    c.city || '',
+    c.postalCode || '',
+    c.region || '',
+    c.country || '',
+    c.countryCode || '',
+    c.lat ?? '',
+    c.lon ?? '',
+    c.timezone || '',
+    c.isp || '',
+    c.device || '',
+    c.os || '',
+    c.osVersion || '',
+    c.browser || '',
+    c.browserVersion || '',
+    c.deviceModel || '',
+    c.deviceVendor || '',
+    c.referrer || '',
+    c.fullAddress || '',
   ]);
 
   const csv = [

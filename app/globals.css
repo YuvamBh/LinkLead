@@ -859,6 +859,29 @@ code, kbd, samp, pre {
   color: #93c5fd;
 }
 
+.chip-ip {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.28);
+  color: #a5b4fc;
+  letter-spacing: 0.02em;
+}
+
+.chip-street {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.22);
+  color: #6ee7b7;
+}
+
+.telemetry-full-addr {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 .telemetry-time {
   font-size: 12px;
   color: var(--text-muted);

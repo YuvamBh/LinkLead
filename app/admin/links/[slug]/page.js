@@ -497,22 +497,44 @@ export default function LinkAnalyticsPage() {
                     <div className="telemetry-indicator" />
                     <div className="telemetry-info">
                       <div className="telemetry-main">
-                        <span>
-                          {click.city && click.city !== 'Unknown'
+                        <span style={{ fontWeight: 600 }}>
+                          {click.streetAddress || click.street
+                            ? `${click.streetAddress || click.street}, ${click.city && click.city !== 'Unknown' ? `${click.city}, ` : ''}${click.country && click.country !== 'Unknown' ? click.country : ''}`
+                            : click.city && click.city !== 'Unknown'
                             ? `${click.city}, ${click.country}`
                             : click.country !== 'Unknown'
                             ? click.country
-                            : 'Unknown Location'}
+                            : 'Location Pending'}
                         </span>
                       </div>
+
+                      {click.fullAddress && (
+                        <div className="telemetry-full-addr">
+                          📍 {click.fullAddress}
+                        </div>
+                      )}
+
                       <div className="telemetry-chips">
+                        {click.ip && (
+                          <span className="chip chip-ip" title="Unmasked visitor IP">
+                            IP: {click.ip}
+                          </span>
+                        )}
+                        {(click.streetAddress || click.street) && (
+                          <span className="chip chip-street">
+                            📍 {click.streetAddress || click.street}
+                          </span>
+                        )}
                         <span className="chip">{click.device} · {click.os}</span>
                         <span className="chip">{click.browser}</span>
                         <span className="chip">via {click.referrer || 'Direct'}</span>
-                        {click.lat != null && (
+                        {click.lat != null && click.lon != null && (
                           <span className="chip chip-geo">
-                            {click.lat.toFixed(2)}, {click.lon.toFixed(2)}
+                            {click.lat.toFixed(4)}, {click.lon.toFixed(4)}
                           </span>
+                        )}
+                        {click.isp && click.isp !== 'Unknown' && (
+                          <span className="chip">{click.isp}</span>
                         )}
                       </div>
                     </div>
