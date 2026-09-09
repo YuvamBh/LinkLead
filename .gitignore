@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# env files - never commit secrets
+.env*
+!.env.example
+
+# local data store - keep structure, ignore runtime data
+data/clicks.json
+data/links.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
