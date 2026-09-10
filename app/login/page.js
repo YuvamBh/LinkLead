@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -12,7 +13,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!password.trim()) return;
+    if (!email.trim() || !password.trim()) return;
     setError('');
     setLoading(true);
 
@@ -20,14 +21,14 @@ export default function LoginPage() {
       const res = await fetch('/api/admin/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (res.ok) {
         router.push('/admin');
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Invalid credentials. Check your admin password.');
+        setError(data.error || 'Invalid credentials. Check your email and password.');
       }
     } catch {
       setError('Network communication failed. Please retry.');
@@ -65,9 +66,26 @@ export default function LoginPage() {
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="form-field">
+            <label className="form-label" htmlFor="admin-email">
+              <span>Email Address</span>
+            </label>
+            <div className="input-container">
+              <input
+                id="admin-email"
+                type="email"
+                className="text-input"
+                placeholder="admin@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoFocus
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-field">
             <label className="form-label" htmlFor="admin-password">
-              <span>Admin Password</span>
-              <span className="form-label-hint">Default: admin</span>
+              <span>Password</span>
             </label>
             <div className="input-container">
               <input
@@ -77,7 +95,6 @@ export default function LoginPage() {
                 placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoFocus
                 required
               />
               <button

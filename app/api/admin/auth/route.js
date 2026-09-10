@@ -1,42 +1,45 @@
 import { NextResponse } from 'next/server';
+import { createAuthClient } from '@/lib/supabase';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
-const COOKIE_NAME = 'linklead_auth';
-const COOKIE_VALUE = 'authenticated';
-
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { password } = body;
+    const { email, password } = body;
 
-    if (password !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    const response = NextResponse.json({ success: true });
-    response.cookies.set(COOKIE_NAME, COOKIE_VALUE, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+    const cookieStore = await cookies();
+    const supabase = createAuthClient(cookieStore);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
-    return response;
-  } catch {
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+
+    return NextResponse.json({ success: true, user: data.user });
+  } catch (err) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 }
 
 export async function DELETE() {
-  const response = NextResponse.json({ success: true });
-  response.cookies.set(COOKIE_NAME, '', {
-    httpOnly: true,
-    path: '/',
-    maxAge: 0,
-  });
-  return response;
+  try {
+    const cookieStore = await cookies();
+    const supabase = createAuthClient(cookieStore);
+    
+    await supabase.auth.signOut();
+    
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return NextResponse.json({ error: 'Failed to sign out' }, { status: 500 });
+  }
 }
