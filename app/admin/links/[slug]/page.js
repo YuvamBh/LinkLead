@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Chart from 'chart.js/auto';
+import AiSidebar from '../../components/AiSidebar';
 
 export default function LinkAnalyticsPage() {
   const params = useParams();
@@ -214,6 +215,16 @@ export default function LinkAnalyticsPage() {
 
   return (
     <div className="app-shell">
+
+      {/* Persistent AI Advisor — scoped to this specific link */}
+      <AiSidebar
+        context={{
+          page: 'link',
+          slug: linkSlug,
+          link: linkInfo || undefined,
+        }}
+      />
+
       {/* ── Top Header ─────────────────────────────────────────────────── */}
       <header className="app-header">
         <div className="header-container">
@@ -272,7 +283,17 @@ export default function LinkAnalyticsPage() {
             <div className="link-hero-slug">
               <span>/{linkSlug}</span>
               <span className="status-pill">Active</span>
+              {linkInfo?.category && (
+                <span className={`category-badge ${linkInfo.category.toLowerCase()}`}>
+                  {linkInfo.category}
+                </span>
+              )}
             </div>
+            {linkInfo?.label && (
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {linkInfo.label}
+              </div>
+            )}
             {linkInfo && (
               <div className="link-hero-destination">
                 <span>Directs to:</span>
