@@ -11,7 +11,7 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { slug, destination } = body;
+    const { slug, destination, category, label } = body;
 
     if (!slug || !destination) {
       return NextResponse.json({ error: 'Both slug and destination are required' }, { status: 400 });
@@ -30,7 +30,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid destination URL' }, { status: 400 });
     }
 
-    const result = await addLink({ slug, destination });
+    const result = await addLink({ slug, destination, category, label });
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: 409 });
     }
