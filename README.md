@@ -1,5 +1,7 @@
 # LinkLead
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
 A smart, self-hosted link tracking and analytics platform. Create short links, share them, and watch detailed click analytics roll in in real-time. LinkLead tracks device types, browsers, deep geolocation, referrer sources, and more. 
 
 Designed for speed and scale: LinkLead uses **Supabase (PostgreSQL)** as the primary database, backed by **Upstash Redis** for blazing fast redirect caching in production. It also features a multi-tenant architecture so you can invite other users, and everyone only sees their own data. For local development, it gracefully falls back to local JSON files so you can build and test without setting up any databases!
@@ -79,3 +81,7 @@ Deploy to Vercel and add your environment variables:
 - **[ip-api.com](https://ip-api.com)** - Free IP geolocation 
 - **[OpenStreetMap Nominatim](https://nominatim.org)** - Reverse geocoding for deep street-level analytics
 - **Vanilla CSS** - A highly customized, glassmorphism-inspired dark mode design system
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
